@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EcoLab — Artificial Life Sandbox</title>
+
+<!-- Google Fonts: display (Space Grotesk), body (Inter), data/mono (Space Mono) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+<style>
+/* ============================================================================
+   EcoLab — a small ecology / artificial-life simulator.
+   Everything (styles + logic) lives in this one file. Palette is a
+   "field-lab console": pine ink background, marigold + teal accents.
+   ========================================================================== */
+
+:root{
+  --ink:        #0e1a19;   /* page background            */
+  --ink-2:      #13272400; /* (unused placeholder)       */
+  --panel:      #142926;   /* panel surface              */
+  --panel-2:    #1b322e;   /* raised surface / inputs     */
+  --line:       #2a4741;   /* hairline borders           */
+  --line-soft:  #21403a;
+  --text:       #e9e7dc;   /* primary parchment text     */
+  --muted:      #8ba39b;   /* secondary text             */
+  --amber:      #e8a13a;   /* primary accent (marigold)  */
+  --amber-dim:  #b87d27;
+  --teal:       #4fd0c4;   /* secondary accent           */
+  --danger:     #e0705f;   /* death / extinction         */
+  --good:       #7bc86c;
+  --radius:     10px;
+  --shadow:     0 10px 30px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1200px 600px at 15% -10%, #17302c 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #12312e 0%, transparent 50%),
+    var(--ink);
+  color:var(--text);
+  font-family:"Inter",system-ui,sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- Header ------------------------------------------------------------- */
+header.app{
+  padding:22px 26px 14px;
+  border-bottom:1px solid var(--line-soft);
+}
+.brand{
+  display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+}
+.brand h1{
+  font-family:"Space Grotesk",sans-serif;
+  font-weight:700;font-size:26px;letter-spacing:-.5px;margin:0;
+}
+.brand h1 .dot{color:var(--amber);}
+.brand .tag{
+  font-family:"Space Mono",monospace;
+  color:var(--muted);font-size:12px;letter-spacing:.5px;text-transform:uppercase;
+}
+
+/* ---- Layout ------------------------------------------------------------- */
+main{
+  display:grid;
+  grid-template-columns: 320px minmax(0,1fr) 340px;
+  gap:18px;
+  padding:18px 26px 40px;
+  align-items:start;
+}
+@media (max-width:1180px){
+  main{grid-template-columns:1fr;}
+}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+}
+.panel .head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:13px 16px;border-bottom:1px solid var(--line-soft);
+}
+.panel .head .eyebrow{
+  font-family:"Space Mono",monospace;font-size:11px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--amber);
+}
+.panel .head h2{
+  font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:16px;margin:0;
+}
+.panel .body{padding:14px 16px;}
+
+/* ---- Form controls ------------------------------------------------------ */
+label.field{display:block;margin:0 0 11px;}
+label.field > .lbl{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--muted);margin-bottom:5px;
+}
+label.field > .lbl .val{color:var(--teal);font-weight:700;}
+
+input[type="text"], input[type="number"], select{
+  width:100%;background:var(--panel-2);border:1px solid var(--line);
+  color:var(--text);border-radius:8px;padding:8px 10px;font:inherit;
+  font-size:13px;outline:none;
+}
+input[type="text"]:focus, input[type="number"]:focus, select:focus{
+  border-color:var(--amber);
+}
+input[type="color"]{
+  width:100%;height:34px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel-2);padding:3px;cursor:pointer;
+}
+input[type="range"]{
+  width:100%;accent-color:var(--amber);cursor:pointer;height:22px;
+}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.checkline{
+  display:flex;align-items:center;gap:8px;margin:2px 0 11px;
+  font-size:13px;color:var(--text);
+}
+.checkline input{accent-color:var(--amber);width:16px;height:16px;}
+
+/* ---- Buttons ------------------------------------------------------------ */
+button{
+  font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
+  background:var(--panel-2);color:var(--text);padding:9px 12px;
+  transition:transform .04s ease, background .15s ease, border-color .15s ease;
+}
+button:hover{border-color:var(--amber-dim);}
+button:active{transform:translateY(1px);}
+button.primary{
+  background:var(--amber);border-color:var(--amber);color:#241705;font-weight:700;
+}
+button.primary:hover{background:#f0ad4a;}
+button.ghost{background:transparent;}
+button.wide{width:100%;}
+button:disabled{opacity:.45;cursor:not-allowed;}
+
+/* ---- Relation / food-web editor ---------------------------------------- */
+.relwrap{margin:2px 0 6px;}
+.relrow{
+  display:flex;align-items:center;gap:8px;margin-bottom:6px;
+  font-size:13px;
+}
+.relrow .ico{width:22px;text-align:center;font-size:16px;}
+.relrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.relrow select{width:104px;flex:0 0 auto;padding:5px 6px;font-size:12px;}
+.hint{font-size:12px;color:var(--muted);margin:4px 0 10px;}
+
+/* ---- Type list ---------------------------------------------------------- */
+.typelist{display:flex;flex-direction:column;gap:8px;}
+.typecard{
+  display:flex;align-items:center;gap:10px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;
+}
+.typecard .swatch{
+  width:26px;height:26px;border-radius:6px;display:flex;align-items:center;
+  justify-content:center;font-size:16px;flex:0 0 auto;
+}
+.typecard .meta{flex:1;min-width:0;}
+.typecard .meta .n{font-weight:600;font-size:13px;}
+.typecard .meta .s{
+  font-family:"Space Mono",monospace;font-size:11px;color:var(--muted);
+}
+.typecard .cnt{
+  font-family:"Space Mono",monospace;font-weight:700;font-size:15px;color:var(--teal);
+  min-width:34px;text-align:right;
+}
+.typecard button.x{padding:4px 8px;font-size:12px;line-height:1;color:var(--danger);}
+
+/* ---- Food-web matrix ---------------------------------------------------- */
+.matrix{overflow-x:auto;}
+table.web{border-collapse:collapse;font-family:"Space Mono",monospace;font-size:12px;}
+table.web th, table.web td{
+  border:1px solid var(--line-soft);padding:0;text-align:center;
+}
+table.web th{color:var(--muted);font-weight:400;padding:4px 6px;white-space:nowrap;}
+table.web th.corner{font-size:10px;color:var(--amber);text-align:left;}
+table.web td.self{background:#0c1817;color:#3c5b54;}
+table.web td button.cell{
+  width:34px;height:30px;border:none;background:transparent;border-radius:0;
+  font-size:15px;color:var(--muted);
+}
+table.web td button.cell.food{color:var(--good);background:rgba(123,200,108,.10);}
+table.web td button.cell.threat{color:var(--danger);background:rgba(224,112,95,.10);}
+.matrix .legend{font-size:11px;color:var(--muted);margin-top:8px;}
+
+/* ---- Simulation stage --------------------------------------------------- */
+.stage-wrap{position:relative;}
+#simCanvas{
+  display:block;width:100%;height:auto;border-radius:8px;
+  background:
+    radial-gradient(120% 120% at 50% 0%, #10201d 0%, #0a1513 100%);
+  border:1px solid var(--line);
+  box-shadow: inset 0 0 60px rgba(0,0,0,.5);
+  touch-action:none;
+}
+
+/* Simulation controls bar */
+.controls{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:12px 16px;border-top:1px solid var(--line-soft);
+}
+.controls .spacer{flex:1;}
+.controls .speedbox{
+  display:flex;align-items:center;gap:8px;
+  font-family:"Space Mono",monospace;font-size:12px;color:var(--muted);
+}
+.controls .speedbox input[type=range]{width:130px;}
+.stat{
+  font-family:"Space Mono",monospace;font-size:12px;color:var(--muted);
+}
+.stat b{color:var(--text);}
+.warn{
+  color:var(--danger);font-family:"Space Mono",monospace;font-size:12px;
+  display:none;
+}
+.warn.show{display:inline;}
+
+/* ---- Chart -------------------------------------------------------------- */
+#chartCanvas{
+  display:block;width:100%;height:auto;border-radius:8px;
+  background:#0c1817;border:1px solid var(--line);
+}
+.legend{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
+.legrow{display:flex;align-items:center;gap:8px;font-size:12px;}
+.legrow .chip{width:12px;height:12px;border-radius:3px;flex:0 0 auto;}
+.legrow .ln{flex:1;font-family:"Space Mono",monospace;}
+.legrow .lc{font-family:"Space Mono",monospace;color:var(--teal);font-weight:700;}
+
+footer.app{
+  padding:14px 26px 30px;color:var(--muted);font-size:12px;
+  font-family:"Space Mono",monospace;border-top:1px solid var(--line-soft);
+}
+footer.app b{color:var(--text);}
+a{color:var(--teal);}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="brand">
+    <h1>Eco<span class="dot">·</span>Lab</h1>
+    <span class="tag">artificial-life sandbox · design a species, watch the food web</span>
+  </div>
+</header>
+
+<main>
+  <!-- ===================== LEFT: DESIGNER + TYPES ===================== -->
+  <section class="panel" id="designerPanel">
+    <div class="head">
+      <span class="eyebrow">Section 01</span>
+      <h2>Organism Designer</h2>
+    </div>
+    <div class="body">
+
+      <label class="field">
+        <span class="lbl">Name</span>
+        <input type="text" id="f_name" placeholder="e.g. Rabbit" value="Rabbit" />
+      </label>
+
+      <div class="row2">
+        <label class="field">
+          <span class="lbl">Icon</span>
+          <input type="text" id="f_icon" maxlength="3" value="🐇" />
+        </label>
+        <label class="field">
+          <span class="lbl">Color</span>
+          <input type="color" id="f_color" value="#e8a13a" />
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="lbl">Speed <span class="val" id="v_speed">1.4</span></span>
+        <input type="range" id="f_speed" min="0" max="5" step="0.1" value="1.4" />
+      </label>
+
+      <label class="field">
+        <span class="lbl">Sensory range <span class="val" id="v_sensory">90</span></span>
+        <input type="range" id="f_sensory" min="0" max="220" step="5" value="90" />
+      </label>
+
+      <label class="field">
+        <span class="lbl">Max health <span class="val" id="v_maxhp">100</span></span>
+        <input type="range" id="f_maxhp" min="20" max="300" step="5" value="100" />
+      </label>
+
+      <label class="field">
+        <span class="lbl">Energy cost / tick <span class="val" id="v_cost">0.25</span></span>
+        <input type="range" id="f_cost" min="0" max="1.5" step="0.01" value="0.25" />
+      </label>
+
+      <label class="field">
+        <span class="lbl">Energy gained per meal <span class="val" id="v_gain">35</span></span>
+        <input type="range" id="f_gain" min="5" max="150" step="1" value="35" />
+      </label>
+
+      <label class="field">
+        <span class="lbl">Reproduction threshold <span class="val" id="v_repro">75%</span></span>
+        <input type="range" id="f_repro" min="20" max="100" step="1" value="75" />
+      </label>
+
+      <label class="field">
+        <span class="lbl">Reproduction cost <span class="val" id="v_rcost">45</span></span>
+        <input type="range" id="f_rcost" min="5" max="150" step="1" value="45" />
+      </label>
+
+      <label class="checkline">
+        <input type="checkbox" id="f_producer" />
+        Producer (gains energy passively, like a plant)
+      </label>
+
+      <label class="field" id="produceWrap" style="display:none;">
+        <span class="lbl">Energy produced / tick <span class="val" id="v_prod">0.6</span></span>
+        <input type="range" id="f_prod" min="0" max="2" step="0.05" value="0.6" />
+      </label>
+
+      <!-- Diet / interaction rules toward already-defined types -->
+      <div class="relwrap">
+        <span class="lbl" style="display:block;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Diet — how it treats existing types</span>
+        <div id="designerRels"></div>
+        <p class="hint" id="noTypesHint">No other types yet. Add this one, then define more — you can wire up the food web in the matrix below any time.</p>
+      </div>
+
+      <label class="field">
+        <span class="lbl">Starting population <span class="val" id="v_pop">20</span></span>
+        <input type="range" id="f_pop" min="0" max="120" step="1" value="20" />
+      </label>
+
+      <button class="primary wide" id="addBtn">Add to simulation</button>
+    </div>
+
+    <!-- Defined types list -->
+    <div class="head" style="border-top:1px solid var(--line-soft);">
+      <span class="eyebrow">Roster</span>
+      <h2>Defined types</h2>
+    </div>
+    <div class="body">
+      <div class="typelist" id="typeList"></div>
+      <p class="hint" id="emptyRoster" style="display:none;">No organism types defined yet.</p>
+    </div>
+
+    <!-- Food-web matrix -->
+    <div class="head" style="border-top:1px solid var(--line-soft);">
+      <span class="eyebrow">Interactions</span>
+      <h2>Food web</h2>
+    </div>
+    <div class="body">
+      <div class="matrix" id="matrixWrap"></div>
+      <div class="legend" style="margin-top:6px;font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">
+        Rows act on columns · click a cell to cycle: <span style="color:var(--muted)">·</span> neutral →
+        <span style="color:var(--good)">🍴</span> eats →
+        <span style="color:var(--danger)">⚠</span> avoids
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CENTER: SIMULATION ===================== -->
+  <section class="panel">
+    <div class="head">
+      <span class="eyebrow">Section 02</span>
+      <h2>Specimen Chamber</h2>
+    </div>
+    <div class="body" style="padding:14px;">
+      <div class="stage-wrap">
+        <canvas id="simCanvas" width="600" height="480"></canvas>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="primary" id="playBtn">Pause</button>
+      <button id="resetBtn">Reset &amp; reseed</button>
+      <div class="spacer"></div>
+      <div class="speedbox">
+        <span>Speed</span>
+        <input type="range" id="speed" min="0.25" max="8" step="0.25" value="1" />
+        <span id="speedVal">1.0×</span>
+      </div>
+    </div>
+    <div class="controls" style="border-top:none;padding-top:0;">
+      <span class="stat">Tick <b id="tickStat">0</b></span>
+      <span class="stat">Population <b id="popStat">0</b></span>
+      <span class="warn" id="capWarn">⚠ population cap reached — reproduction paused</span>
+    </div>
+  </section>
+
+  <!-- ===================== RIGHT: CHART ===================== -->
+  <section class="panel">
+    <div class="head">
+      <span class="eyebrow">Section 03</span>
+      <h2>Population over time</h2>
+    </div>
+    <div class="body">
+      <canvas id="chartCanvas" width="320" height="180"></canvas>
+      <div class="legend" id="chartLegend"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="app">
+  <b>Tip:</b> a food web needs a base — mark at least one type as a <b>Producer</b> so energy enters the system.
+  Then something to eat it, then something to eat that. Balance is fragile on purpose — extinction is a valid outcome.
+</footer>
+
+<script>
+/* ============================================================================
+   ECOLAB SIMULATION
+   ----------------------------------------------------------------------------
+   Data model
+     - "types"  : species definitions the user designs (stats + relations).
+     - "orgs"   : live individual organisms in the world.
+   The world runs in discrete steps. Each step:
+     1. metabolism (lose energy; producers gain it)
+     2. sense nearby food/threats within sensory range, then steer + move
+     3. eating (predator overlapping prey removes prey, gains energy)
+     4. reproduction (above threshold -> spawn nearby, pay a cost)
+     5. remove the dead, sample the population chart
+   Neighbour lookups use a spatial hash grid so we avoid O(n^2) scans.
+   Tweak the CONSTANTS block or any species stat to change the ecology.
+   ========================================================================== */
+
+// ---------- Tunable constants ----------------------------------------------
+const CELL = 60;          // spatial-hash cell size (px)
+const EAT_DIST = 13;      // how close a predator must be to eat prey (px)
+const REPRO_COOLDOWN = 80;// steps an organism must wait between births
+const SOFT_CAP = 650;     // soft population ceiling (reproduction pauses above)
+const HISTORY_MAX = 240;  // chart samples kept
+const SAMPLE_EVERY = 4;   // sample the chart every N steps
+const ORG_R = 9;          // organism draw radius (px)
+
+// ---------- World state -----------------------------------------------------
+const sim = document.getElementById('simCanvas');
+const W = sim.width, H = sim.height;          // logical world size = canvas attr size
+const sctx = sim.getContext('2d');
+
+let types = [];                 // array of species definition objects
+const typeById = new Map();     // id -> type (fast lookup)
+let orgs = [];                  // array of live organisms
+let running = true;             // play/pause
+let simSpeed = 1;               // steps-per-frame multiplier
+let tick = 0;
+let idCounter = 0;
+let history = [];               // [{typeId: count, ...}, ...]
+let acc = 0;                    // fractional step accumulator (for speed<1)
+
+const clamp = (v,a,b)=>v<a?a:(v>b?b:v);
+const rand  = (a,b)=>a+Math.random()*(b-a);
+
+// ---------- Type + organism factories --------------------------------------
+function makeType(cfg){
+  const t = Object.assign({
+    id: 't'+(idCounter++),
+    name:'Organism', icon:'🦠', color:'#7bc86c',
+    speed:1.2, sensory:90, maxHealth:100, energyCost:0.25,
+    eatGain:35, reproPct:0.75, reproCost:45,
+    producer:false, produceRate:0.6,
+    startPop:20,
+    rel:{}   // { otherTypeId: 'food' | 'threat' }
+  }, cfg);
+  return t;
+}
+
+function makeOrg(t, x, y, health){
+  return {
+    tid: t.id,
+    x, y,
+    vx: rand(-1,1)*t.speed, vy: rand(-1,1)*t.speed,
+    health: health,
+    reproCd: REPRO_COOLDOWN,   // newborns wait before they can breed
+    dead:false, r: ORG_R
+  };
+}
+
+function spawn(t, n){
+  for(let i=0;i<n;i++){
+    orgs.push(makeOrg(t, rand(ORG_R, W-ORG_R), rand(ORG_R, H-ORG_R), t.maxHealth*0.7));
+  }
+}
+
+// ---------- Relations -------------------------------------------------------
+// What does organism-type `t` think of organism `p`?
+//   - explicit 'food'/'threat' from t.rel
+//   - PLUS: if p's type eats t, t automatically treats p as a threat (flee).
+function relationOf(t, p){
+  const pt = typeById.get(p.tid);
+  const explicit = t.rel[p.tid];
+  const predatorOfMe = pt && pt.rel[t.id] === 'food';
+  if(explicit === 'threat' || predatorOfMe) return 'threat';
+  if(explicit === 'food') return 'food';
+  return null;
+}
+
+// ---------- Spatial hash grid ----------------------------------------------
+function buildGrid(list){
+  const g = new Map();
+  for(let i=0;i<list.length;i++){
+    const o = list[i];
+    if(o.dead) continue;
+    const k = (Math.floor(o.x/CELL))+','+(Math.floor(o.y/CELL));
+    let arr = g.get(k);
+    if(!arr){ arr=[]; g.set(k,arr); }
+    arr.push(o);
+  }
+  return g;
+}
+function forNeighbors(grid, o, rad, cb){
+  const cx = Math.floor(o.x/CELL), cy = Math.floor(o.y/CELL);
+  for(let dx=-rad;dx<=rad;dx++){
+    for(let dy=-rad;dy<=rad;dy++){
+      const arr = grid.get((cx+dx)+','+(cy+dy));
+      if(arr) for(let k=0;k<arr.length;k++) cb(arr[k]);
+    }
+  }
+}
+
+// ---------- One simulation step --------------------------------------------
+function step(){
+  tick++;
+
+  // Phase 1: metabolism + sensing + movement -------------------------------
+  const gSense = buildGrid(orgs);
+  for(let i=0;i<orgs.length;i++){
+    const o = orgs[i]; if(o.dead) continue;
+    const t = typeById.get(o.tid);
+
+    // metabolism: producers gain, everyone pays a base cost
+    if(t.producer) o.health = Math.min(t.maxHealth, o.health + t.produceRate);
+    o.health -= t.energyCost;
+
+    // sensing: find nearest food and nearest threat inside sensory range
+    let food=null, fd=Infinity, threat=null, td=Infinity;
+    if(t.sensory>0 && t.speed>0){
+      const rad = Math.max(1, Math.ceil(t.sensory/CELL));
+      const sr2 = t.sensory*t.sensory;
+      forNeighbors(gSense, o, rad, (p)=>{
+        if(p===o || p.dead) return;
+        const rel = relationOf(t, p);
+        if(!rel) return;
+        const dx=p.x-o.x, dy=p.y-o.y, d2=dx*dx+dy*dy;
+        if(d2>sr2) return;
+        if(rel==='threat'){ if(d2<td){ td=d2; threat=p; } }
+        else if(rel==='food'){ if(d2<fd){ fd=d2; food=p; } }
+      });
+    }
+
+    // steering: random wander, plus flee-threat (strong) or seek-food
+    let ax = rand(-0.5,0.5), ay = rand(-0.5,0.5);
+    if(threat){
+      const dx=o.x-threat.x, dy=o.y-threat.y, d=Math.hypot(dx,dy)||1;
+      ax += (dx/d)*2.2; ay += (dy/d)*2.2;      // flee wins over hunger
+    } else if(food){
+      const dx=food.x-o.x, dy=food.y-o.y, d=Math.hypot(dx,dy)||1;
+      ax += (dx/d)*1.4; ay += (dy/d)*1.4;
+    }
+
+    // move (stationary producers with speed 0 just sit)
+    if(t.speed>0){
+      o.vx = o.vx*0.82 + ax*0.5;
+      o.vy = o.vy*0.82 + ay*0.5;
+      const sp = Math.hypot(o.vx,o.vy);
+      if(sp>t.speed){ o.vx = o.vx/sp*t.speed; o.vy = o.vy/sp*t.speed; }
+      o.x += o.vx; o.y += o.vy;
+      o.health -= t.energyCost*0.6*(sp/t.speed);   // moving costs extra energy
+
+      // bounce off the chamber walls (keeps everyone in bounds)
+      if(o.x<o.r){ o.x=o.r; o.vx=Math.abs(o.vx); }
+      else if(o.x>W-o.r){ o.x=W-o.r; o.vx=-Math.abs(o.vx); }
+      if(o.y<o.r){ o.y=o.r; o.vy=Math.abs(o.vy); }
+      else if(o.y>H-o.r){ o.y=H-o.r; o.vy=-Math.abs(o.vy); }
+    }
+  }
+
+  // Phase 2: eating (rebuild grid after movement) --------------------------
+  const gEat = buildGrid(orgs);
+  const eat2 = EAT_DIST*EAT_DIST;
+  for(let i=0;i<orgs.length;i++){
+    const o = orgs[i]; if(o.dead) continue;
+    const t = typeById.get(o.tid);
+    forNeighbors(gEat, o, 1, (p)=>{
+      if(p===o || p.dead || o.dead) return;
+      if(t.rel[p.tid] !== 'food') return;        // o eats p?
+      const dx=p.x-o.x, dy=p.y-o.y;
+      if(dx*dx+dy*dy < eat2){
+        p.dead = true;                            // prey removed
+        o.health = Math.min(t.maxHealth, o.health + t.eatGain);
+      }
+    });
+  }
+
+  // Phase 3: reproduction ---------------------------------------------------
+  const babies = [];
+  for(let i=0;i<orgs.length;i++){
+    const o = orgs[i]; if(o.dead) continue;
+    const t = typeById.get(o.tid);
+    if(o.reproCd>0) o.reproCd--;
+    if(o.reproCd<=0 &&
+       o.health >= t.maxHealth*t.reproPct &&
+       (orgs.length + babies.length) < SOFT_CAP){
+      o.health -= t.reproCost;                    // reproduction isn't free
+      o.reproCd = REPRO_COOLDOWN;
+      const a = Math.random()*Math.PI*2, dist = 12+Math.random()*12;
+      const nx = clamp(o.x+Math.cos(a)*dist, o.r, W-o.r);
+      const ny = clamp(o.y+Math.sin(a)*dist, o.r, H-o.r);
+      babies.push(makeOrg(t, nx, ny, t.maxHealth*0.5));
+    }
+  }
+  for(let i=0;i<babies.length;i++) orgs.push(babies[i]);
+
+  // Phase 4: remove the dead ------------------------------------------------
+  let anyDead = false;
+  for(let i=0;i<orgs.length;i++){ if(orgs[i].dead || orgs[i].health<=0){ anyDead=true; break; } }
+  if(anyDead) orgs = orgs.filter(o=>!o.dead && o.health>0);
+
+  // sample the chart
+  if(tick % SAMPLE_EVERY === 0) sampleHistory();
+}
+
+function sampleHistory(){
+  const counts = {};
+  for(const t of types) counts[t.id] = 0;
+  for(const o of orgs) counts[o.tid] = (counts[o.tid]||0)+1;
+  history.push(counts);
+  if(history.length>HISTORY_MAX) history.shift();
+}
+
+// ---------- Rendering: simulation ------------------------------------------
+function render(){
+  sctx.clearRect(0,0,W,H);
+
+  // faint reference grid inside the chamber
+  sctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  sctx.lineWidth = 1;
+  for(let x=CELL;x<W;x+=CELL){ sctx.beginPath(); sctx.moveTo(x,0); sctx.lineTo(x,H); sctx.stroke(); }
+  for(let y=CELL;y<H;y+=CELL){ sctx.beginPath(); sctx.moveTo(0,y); sctx.lineTo(W,y); sctx.stroke(); }
+
+  // organisms
+  sctx.textAlign='center'; sctx.textBaseline='middle';
+  for(let i=0;i<orgs.length;i++){
+    const o = orgs[i];
+    const t = typeById.get(o.tid);
+    if(!t) continue;
+
+    // body: emoji/text icon if provided, else a colored disc
+    if(t.icon && t.icon.trim()){
+      sctx.font = '18px "Inter", sans-serif';
+      sctx.fillText(t.icon, o.x, o.y+1);
+    } else {
+      sctx.beginPath();
+      sctx.fillStyle = t.color;
+      sctx.arc(o.x, o.y, o.r, 0, Math.PI*2);
+      sctx.fill();
+    }
+
+    // health bar above the organism
+    const bw=18, bh=3, bx=o.x-bw/2, by=o.y-o.r-8;
+    const frac = clamp(o.health/t.maxHealth, 0, 1);
+    sctx.fillStyle = 'rgba(0,0,0,0.55)';
+    sctx.fillRect(bx-1, by-1, bw+2, bh+2);
+    sctx.fillStyle = t.color;
+    sctx.fillRect(bx, by, bw*frac, bh);
+  }
+
+  // extinction / empty states
+  if(types.length===0){
+    drawCenterMsg('Design a species →', 'Define an organism on the left, then press Add.', 'var');
+  } else if(orgs.length===0){
+    drawCenterMsg('EXTINCTION', 'Every organism has died. Reset & reseed, or tweak the stats.', 'danger');
+  }
+}
+
+function drawCenterMsg(title, sub, kind){
+  sctx.save();
+  sctx.textAlign='center';
+  sctx.fillStyle = kind==='danger' ? '#e0705f' : '#8ba39b';
+  sctx.font = '700 30px "Space Grotesk", sans-serif';
+  sctx.fillText(title, W/2, H/2-8);
+  sctx.fillStyle = '#8ba39b';
+  sctx.font = '13px "Space Mono", monospace';
+  sctx.fillText(sub, W/2, H/2+22);
+  sctx.restore();
+}
+
+// ---------- Rendering: population chart -------------------------------------
+const chart = document.getElementById('chartCanvas');
+const cctx = chart.getContext('2d');
+const CW = chart.width, CH = chart.height;
+
+function renderChart(){
+  cctx.clearRect(0,0,CW,CH);
+  const padL=6, padR=6, padT=8, padB=8;
+  const plotW = CW-padL-padR, plotH = CH-padT-padB;
+
+  // y-axis auto-scale to the tallest single-type count in the window
+  let yMax = 10;
+  for(const s of history) for(const t of types) if(s[t.id]>yMax) yMax = s[t.id];
+  yMax = Math.ceil(yMax*1.1);
+
+  // faint gridlines
+  cctx.strokeStyle='rgba(255,255,255,0.05)'; cctx.lineWidth=1;
+  for(let g=0;g<=4;g++){
+    const y = padT + plotH*(g/4);
+    cctx.beginPath(); cctx.moveTo(padL,y); cctx.lineTo(CW-padR,y); cctx.stroke();
+  }
+
+  if(history.length<2) return;
+  const n = history.length;
+  const xOf = i => padL + plotW*(i/(HISTORY_MAX-1));
+  const yOf = v => padT + plotH*(1 - v/yMax);
+
+  for(const t of types){
+    cctx.beginPath();
+    cctx.strokeStyle = t.color;
+    cctx.lineWidth = 1.8;
+    for(let i=0;i<n;i++){
+      const v = history[i][t.id]||0;
+      const x = xOf(i + (HISTORY_MAX-n)), y = yOf(v);
+      if(i===0) cctx.moveTo(x,y); else cctx.lineTo(x,y);
+    }
+    cctx.stroke();
+  }
+}
+
+// ---------- Main loop -------------------------------------------------------
+function frame(){
+  if(running && types.length>0){
+    acc += simSpeed;
+    let guard = 0;
+    while(acc>=1 && guard<16){ step(); acc-=1; guard++; }
+  }
+  render();
+  renderChart();
+  updateStats();
+  requestAnimationFrame(frame);
+}
+
+// ---------- Stats + legends -------------------------------------------------
+function liveCount(tid){ let c=0; for(const o of orgs) if(o.tid===tid) c++; return c; }
+
+function updateStats(){
+  document.getElementById('tickStat').textContent = tick;
+  document.getElementById('popStat').textContent  = orgs.length;
+  document.getElementById('capWarn').classList.toggle('show', orgs.length>=SOFT_CAP);
+
+  // live per-type counts on roster cards
+  document.querySelectorAll('.typecard[data-tid]').forEach(card=>{
+    const el = card.querySelector('.cnt');
+    if(el) el.textContent = liveCount(card.dataset.tid);
+  });
+  // chart legend counts
+  document.querySelectorAll('.legrow[data-tid]').forEach(row=>{
+    const el = row.querySelector('.lc');
+    if(el) el.textContent = liveCount(row.dataset.tid);
+  });
+}
+
+// ---------- UI: designer relation selects ----------------------------------
+// Temporary relations chosen for the type currently being designed.
+let designerRel = {};
+
+function renderDesignerRels(){
+  const box = document.getElementById('designerRels');
+  const hint = document.getElementById('noTypesHint');
+  box.innerHTML='';
+  if(types.length===0){ hint.style.display='block'; return; }
+  hint.style.display='none';
+  for(const t of types){
+    const row = document.createElement('div');
+    row.className='relrow';
+    row.innerHTML = `
+      <span class="ico">${t.icon||'●'}</span>
+      <span class="nm">${escapeHtml(t.name)}</span>
+      <select data-tid="${t.id}">
+        <option value="">neutral</option>
+        <option value="food">eats it</option>
+        <option value="threat">avoids it</option>
+      </select>`;
+    const sel = row.querySelector('select');
+    sel.value = designerRel[t.id] || '';
+    sel.addEventListener('change', e=>{
+      const v = e.target.value;
+      if(v) designerRel[t.id]=v; else delete designerRel[t.id];
+    });
+    box.appendChild(row);
+  }
+}
+
+// ---------- UI: roster list -------------------------------------------------
+function renderTypeList(){
+  const list = document.getElementById('typeList');
+  const empty = document.getElementById('emptyRoster');
+  list.innerHTML='';
+  empty.style.display = types.length? 'none':'block';
+  for(const t of types){
+    const card = document.createElement('div');
+    card.className='typecard';
+    card.dataset.tid = t.id;
+    const roleBits = [];
+    if(t.producer) roleBits.push('producer');
+    const preys = types.filter(o=>t.rel[o.id]==='food').map(o=>o.name);
+    if(preys.length) roleBits.push('eats '+preys.join(', '));
+    card.innerHTML = `
+      <div class="swatch" style="background:${t.color}22;border:1px solid ${t.color};">${t.icon||''}</div>
+      <div class="meta">
+        <div class="n">${escapeHtml(t.name)}</div>
+        <div class="s">spd ${t.speed} · sns ${t.sensory} · hp ${t.maxHealth}${roleBits.length? ' · '+roleBits.join(' · '):''}</div>
+      </div>
+      <div class="cnt">0</div>
+      <button class="x" title="Remove type" data-remove="${t.id}">✕</button>`;
+    card.querySelector('[data-remove]').addEventListener('click', ()=>removeType(t.id));
+    list.appendChild(card);
+  }
+}
+
+// ---------- UI: food-web matrix --------------------------------------------
+// Cell (row r, col c) = how species r treats species c: neutral/food/threat.
+function renderMatrix(){
+  const wrap = document.getElementById('matrixWrap');
+  if(types.length<2){
+    wrap.innerHTML = '<p class="hint">Define at least two types to wire up interactions.</p>';
+    return;
+  }
+  let html = '<table class="web"><thead><tr><th class="corner">eats&nbsp;↓&nbsp;/&nbsp;→</th>';
+  for(const c of types) html += `<th title="${escapeHtml(c.name)}">${c.icon||'●'}</th>`;
+  html += '</tr></thead><tbody>';
+  for(const r of types){
+    html += `<tr><th title="${escapeHtml(r.name)}" style="text-align:left">${r.icon||'●'} ${escapeHtml(short(r.name))}</th>`;
+    for(const c of types){
+      if(r.id===c.id){ html += '<td class="self">—</td>'; continue; }
+      const state = r.rel[c.id]||'';
+      const cls = state==='food'?'food':(state==='threat'?'threat':'');
+      const glyph = state==='food'?'🍴':(state==='threat'?'⚠':'·');
+      html += `<td><button class="cell ${cls}" data-r="${r.id}" data-c="${c.id}">${glyph}</button></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('button.cell').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const r = typeById.get(btn.dataset.r);
+      const c = btn.dataset.c;
+      const cur = r.rel[c]||'';
+      const next = cur===''?'food':(cur==='food'?'threat':'');   // cycle
+      if(next) r.rel[c]=next; else delete r.rel[c];
+      renderMatrix();
+      renderTypeList();
+    });
+  });
+}
+
+// ---------- UI: chart legend -----------------------------------------------
+function renderLegend(){
+  const box = document.getElementById('chartLegend');
+  box.innerHTML='';
+  for(const t of types){
+    const row = document.createElement('div');
+    row.className='legrow'; row.dataset.tid=t.id;
+    row.innerHTML = `<span class="chip" style="background:${t.color}"></span>
+      <span class="ln">${escapeHtml(t.name)}</span><span class="lc">0</span>`;
+    box.appendChild(row);
+  }
+}
+
+function renderAllUI(){
+  renderDesignerRels(); renderTypeList(); renderMatrix(); renderLegend();
+}
+
+// ---------- Helpers ---------------------------------------------------------
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function short(s){ return s.length>7? s.slice(0,6)+'…' : s; }
+
+// ---------- Actions: add / remove / reset ----------------------------------
+function readDesigner(){
+  const name = (document.getElementById('f_name').value||'').trim() || ('Type '+(types.length+1));
+  return makeType({
+    name,
+    icon: document.getElementById('f_icon').value.trim(),
+    color: document.getElementById('f_color').value,
+    speed:      parseFloat(document.getElementById('f_speed').value),
+    sensory:    parseFloat(document.getElementById('f_sensory').value),
+    maxHealth:  parseFloat(document.getElementById('f_maxhp').value),
+    energyCost: parseFloat(document.getElementById('f_cost').value),
+    eatGain:    parseFloat(document.getElementById('f_gain').value),
+    reproPct:   parseFloat(document.getElementById('f_repro').value)/100,
+    reproCost:  parseFloat(document.getElementById('f_rcost').value),
+    producer:   document.getElementById('f_producer').checked,
+    produceRate:parseFloat(document.getElementById('f_prod').value),
+    startPop:   parseInt(document.getElementById('f_pop').value,10),
+    rel: Object.assign({}, designerRel)
+  });
+}
+
+function addType(){
+  const t = readDesigner();
+  types.push(t);
+  typeById.set(t.id, t);
+  spawn(t, t.startPop);          // seed this type immediately into the world
+  designerRel = {};              // clear relation picks for the next design
+  // give the next design a fresh-ish name/icon so it's obvious it's new
+  document.getElementById('f_name').value = '';
+  document.getElementById('f_icon').value = '';
+  renderAllUI();
+}
+
+function removeType(id){
+  types = types.filter(t=>t.id!==id);
+  typeById.delete(id);
+  for(const t of types) delete t.rel[id];   // clean dangling relations
+  delete designerRel[id];
+  orgs = orgs.filter(o=>o.tid!==id);
+  // scrub the id from chart history so old lines vanish
+  for(const s of history) delete s[id];
+  renderAllUI();
+}
+
+function resetSim(){
+  orgs = []; history = []; tick = 0; acc = 0;
+  for(const t of types) spawn(t, t.startPop);   // reseed from CURRENT start pops
+}
+
+// ---------- Wire up designer live-value labels -----------------------------
+function bindSlider(id, labelId, fmt){
+  const el = document.getElementById(id), lbl = document.getElementById(labelId);
+  const upd = ()=> lbl.textContent = fmt? fmt(el.value) : el.value;
+  el.addEventListener('input', upd); upd();
+}
+bindSlider('f_speed','v_speed');
+bindSlider('f_sensory','v_sensory');
+bindSlider('f_maxhp','v_maxhp');
+bindSlider('f_cost','v_cost');
+bindSlider('f_gain','v_gain');
+bindSlider('f_repro','v_repro', v=>v+'%');
+bindSlider('f_rcost','v_rcost');
+bindSlider('f_prod','v_prod');
+bindSlider('f_pop','v_pop');
+
+document.getElementById('f_producer').addEventListener('change', e=>{
+  document.getElementById('produceWrap').style.display = e.target.checked? 'block':'none';
+});
+
+document.getElementById('addBtn').addEventListener('click', addType);
+document.getElementById('resetBtn').addEventListener('click', resetSim);
+
+const playBtn = document.getElementById('playBtn');
+playBtn.addEventListener('click', ()=>{
+  running = !running;
+  playBtn.textContent = running? 'Pause':'Play';
+  playBtn.classList.toggle('primary', !running);
+});
+
+const speedEl = document.getElementById('speed');
+speedEl.addEventListener('input', ()=>{
+  simSpeed = parseFloat(speedEl.value);
+  document.getElementById('speedVal').textContent = simSpeed.toFixed(2).replace(/0$/,'')+'×';
+});
+
+// ---------- Seed a demo ecosystem (Plant → Rabbit → Fox) -------------------
+// This gives an immediately-alive food chain. Delete these types to start fresh.
+function seedDemo(){
+  const plant = makeType({ name:'Grass', icon:'🌱', color:'#7bc86c',
+    speed:0, sensory:0, maxHealth:100, energyCost:0.03,
+    producer:true, produceRate:0.75, reproPct:0.9, reproCost:45, startPop:45 });
+
+  const rabbit = makeType({ name:'Rabbit', icon:'🐇', color:'#e8a13a',
+    speed:1.4, sensory:95, maxHealth:100, energyCost:0.28, eatGain:38,
+    reproPct:0.75, reproCost:48, startPop:22 });
+
+  const fox = makeType({ name:'Fox', icon:'🦊', color:'#e0705f',
+    speed:1.9, sensory:135, maxHealth:130, energyCost:0.34, eatGain:60,
+    reproPct:0.82, reproCost:58, startPop:6 });
+
+  rabbit.rel[plant.id] = 'food';   // rabbits eat grass
+  fox.rel[rabbit.id]   = 'food';   // foxes eat rabbits (rabbits auto-flee foxes)
+
+  for(const t of [plant, rabbit, fox]){ types.push(t); typeById.set(t.id, t); }
+  resetSim();
+  renderAllUI();
+}
+
+seedDemo();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
