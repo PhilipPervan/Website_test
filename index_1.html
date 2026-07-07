@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rock Paper Scissors Simulator</title>
+<style>
+  body {
+    font-family: sans-serif;
+    background: #1e1e2f;
+    color: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 1.5rem;
+  }
+  h1 { margin-bottom: 0.3rem; }
+  #stats { margin-bottom: 0.6rem; font-size: 1.1rem; display: flex; gap: 1.5rem; }
+  canvas {
+    background: #12121c;
+    border-radius: 10px;
+    border: 1px solid #333;
+  }
+  .controls { margin-top: 1rem; display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; }
+  button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 8px;
+    background: #4f9dff;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover { background: #3a86e0; }
+  label { font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<h1>Rock · Paper · Scissors Simulator</h1>
+<div id="stats">
+  <span>🪨 Rock: <span id="countRock">0</span></span>
+  <span>📄 Paper: <span id="countPaper">0</span></span>
+  <span>✂️ Scissors: <span id="countScissors">0</span></span>
+</div>
+
+<canvas id="canvas" width="700" height="450"></canvas>
+
+<div class="controls">
+  <button onclick="reset()">Restart</button>
+  <label>Particles per type:
+    <input type="number" id="perType" value="15" min="2" max="60" style="width:4rem">
+  </label>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const TYPES = ['rock', 'paper', 'scissors'];
+const EMOJI = { rock: '🪨', paper: '📄', scissors: '✂️' };
+// what each type beats
+const BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+
+let particles = [];
+const RADIUS = 12;
+const SPEED = 1.6;
+
+function makeParticle(type) {
+  return {
+    type,
+    x: Math.random() * (canvas.width - 2 * RADIUS) + RADIUS,
+    y: Math.random() * (canvas.height - 2 * RADIUS) + RADIUS,
+    vx: (Math.random() - 0.5) * SPEED * 2,
+    vy: (Math.random() - 0.5) * SPEED * 2
+  };
+}
+
+function reset() {
+  const perType = parseInt(document.getElementById('perType').value) || 15;
+  particles = [];
+  TYPES.forEach(type => {
+    for (let i = 0; i < perType; i++) particles.push(makeParticle(type));
+  });
+}
+
+function updateStats() {
+  document.getElementById('countRock').textContent = particles.filter(p => p.type === 'rock').length;
+  document.getElementById('countPaper').textContent = particles.filter(p => p.type === 'paper').length;
+  document.getElementById('countScissors').textContent = particles.filter(p => p.type === 'scissors').length;
+}
+
+function step() {
+  // move
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.x < RADIUS || p.x > canvas.width - RADIUS) p.vx *= -1;
+    if (p.y < RADIUS || p.y > canvas.height - RADIUS) p.vy *= -1;
+    p.x = Math.max(RADIUS, Math.min(canvas.width - RADIUS, p.x));
+    p.y = Math.max(RADIUS, Math.min(canvas.height - RADIUS, p.y));
+  }
+
+  // collisions
+  const toRemove = new Set();
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      if (toRemove.has(i) || toRemove.has(j)) continue;
+      const a = particles[i], b = particles[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < RADIUS * 2) {
+        if (a.type === b.type) {
+          // bounce apart, same type
+          const angle = Math.atan2(dy, dx);
+          a.vx = Math.cos(angle) * SPEED;
+          a.vy = Math.sin(angle) * SPEED;
+          b.vx = -Math.cos(angle) * SPEED;
+          b.vy = -Math.sin(angle) * SPEED;
+        } else if (BEATS[a.type] === b.type) {
+          toRemove.add(j); // a wins, b annihilated
+        } else if (BEATS[b.type] === a.type) {
+          toRemove.add(i); // b wins, a annihilated
+        }
+      }
+    }
+  }
+  if (toRemove.size > 0) {
+    particles = particles.filter((_, idx) => !toRemove.has(idx));
+  }
+
+  // draw
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = `${RADIUS * 2}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const p of particles) {
+    ctx.fillText(EMOJI[p.type], p.x, p.y);
+  }
+
+  updateStats();
+  requestAnimationFrame(step);
+}
+
+reset();
+step();
+</script>
+
+</body>
+</html>
